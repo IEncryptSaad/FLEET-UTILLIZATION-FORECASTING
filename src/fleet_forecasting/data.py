@@ -26,11 +26,15 @@ def load_dataset(csv_path: Path | str = DEFAULT_DATA_PATH) -> pd.DataFrame:
     """
 
     df = pd.read_csv(csv_path)
-    if "date" not in df.columns:
-        raise ValueError("Dataset must contain a 'date' column")
+    df.columns = df.columns.str.strip().str.lower()
+    if "date" in df.columns:
+        df.rename(columns={"date": "ds"}, inplace=True)
 
-    df["date"] = pd.to_datetime(df["date"], utc=True)
-    df = df.sort_values("date").set_index("date")
+    if "ds" not in df.columns:
+        raise ValueError("Dataset must contain a 'ds' column")
+
+    df["ds"] = pd.to_datetime(df["ds"], utc=True).dt.tz_localize(None)
+    df = df.sort_values("ds").set_index("ds", drop=False)
 
     numeric_cols = [
         "total_fleet",
