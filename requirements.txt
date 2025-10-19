@@ -6,3 +6,6 @@ prophet
 statsmodels
 scikit-learn
 plotly
+joblib
+altair
+streamlit
