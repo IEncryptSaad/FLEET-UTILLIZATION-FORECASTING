@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Optional
 
 from . import data as data_utils
-from .models.base import ForecastModel
 from .pipeline import MODEL_REGISTRY, forecast_future, run_training_pipeline
 
 
@@ -60,17 +59,18 @@ def train_and_forecast(
         print(f"  {key}: {value:.4f}")
 
     data = data_utils.load_dataset(dataset_path) if dataset_path else data_utils.load_dataset()
-    model_cls = MODEL_REGISTRY[model_name]
-    model: ForecastModel = model_cls()
+    model_cls = MODEL_REGISTRY[result.model_name]
+    model = model_cls()
     model.fit(data)
 
     future_forecast = forecast_future(model, data, periods=future_periods)
     print(f"\nForecast for the next {future_periods} days:")
-    print(future_forecast.head())
+    print(future_forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].head())
 
     if export_path:
-        export_df = future_forecast.reset_index()
-        export_df.columns = ["date", "utilization_rate"]
+        export_df = future_forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].rename(
+            columns={"ds": "date", "yhat": "utilization_rate"}
+        )
         export_df.to_csv(export_path, index=False)
         print(f"\nSaved future forecast to {export_path}")
 

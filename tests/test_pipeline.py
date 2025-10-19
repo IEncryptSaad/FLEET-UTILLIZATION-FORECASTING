@@ -1,19 +1,18 @@
-from pathlib import Path
-
-import pandas as pd
-
-from fleet_forecasting.pipeline import run_training_pipeline
+from fleet_forecasting.data import load_dataset
+from fleet_forecasting.pipeline import forecast_future, run_training_pipeline
 
 
-def test_run_training_pipeline_arima(tmp_path: Path) -> None:
-    result = run_training_pipeline(model_name="arima", test_days=14)
+def test_run_training_pipeline_returns_forecast_dataframe() -> None:
+    dataset = load_dataset()
+    result = run_training_pipeline(model_name="prophet", dataset=dataset, test_days=14)
     assert result.metrics.rmse >= 0
+    assert set(["yhat", "yhat_lower", "yhat_upper", "ds"]).issubset(result.forecast.columns)
     assert len(result.forecast) == 14
 
-    # ensure CLI compatible export logic
-    export_path = tmp_path / "forecast.csv"
-    df = result.forecast.reset_index()
-    df.columns = ["date", "utilization_rate"]
-    df.to_csv(export_path, index=False)
-    loaded = pd.read_csv(export_path)
-    assert {"date", "utilization_rate"} == set(loaded.columns)
+
+def test_forecast_future_extends_timeline() -> None:
+    dataset = load_dataset()
+    result = run_training_pipeline(model_name="prophet", dataset=dataset, test_days=30)
+    future = forecast_future(result.model, dataset, periods=10)
+    assert len(future) == 10
+    assert future.index[0] > dataset.index[-1]

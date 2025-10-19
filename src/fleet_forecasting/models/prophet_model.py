@@ -15,38 +15,50 @@ class ProphetForecastModel(ForecastModel):
         self.yearly_seasonality = yearly_seasonality
         self.weekly_seasonality = weekly_seasonality
         self._model: Optional[Prophet] = None
+        self._history: Optional[pd.DataFrame] = None
 
     def fit(self, history: pd.DataFrame) -> None:
-        df = history.copy()
-        if "ds" in df.columns:
-            ds_series = df["ds"]
-        else:
-            ds_series = df.index.to_series(index=df.index, name="ds")
-
+        df = self._coerce_datetime_index(history)
         if self.target_column not in df.columns:
             raise ValueError(f"History must contain target column '{self.target_column}'")
 
-        y_series = df[self.target_column]
-        df = pd.DataFrame({"ds": ds_series, "y": y_series})
-        df["ds"] = pd.to_datetime(df["ds"], utc=True).dt.tz_localize(None)
+        training_df = df[["ds", self.target_column]].rename(columns={self.target_column: "y"})
+        training_df = training_df.dropna(subset=["y"])
+
+        if len(training_df) < 15:
+            raise ValueError("Prophet requires at least 15 observations for stable fitting")
+
         self._model = Prophet(
             yearly_seasonality=self.yearly_seasonality,
             weekly_seasonality=self.weekly_seasonality,
             daily_seasonality=False,
         )
-        self._model.fit(df[["ds", "y"]])
+        self._model.fit(training_df[["ds", "y"]])
+        self._history = training_df
 
-    def predict(self, future: pd.DataFrame) -> pd.Series:
+    def predict(self, future: pd.DataFrame) -> pd.DataFrame:
         if self._model is None:
             raise RuntimeError("Model must be fitted before calling predict")
 
-        df_future = future.copy()
-        if "ds" in df_future.columns:
-            ds_series = df_future["ds"]
-        else:
-            ds_series = df_future.index.to_series(index=df_future.index, name="ds")
+        df_future = self._coerce_datetime_index(future)
+        ds_values = df_future.index
+        forecast = self._model.predict(pd.DataFrame({"ds": ds_values}))
+        forecast["ds"] = pd.to_datetime(forecast["ds"], utc=True).dt.tz_localize(None)
+        forecast = forecast.set_index("ds").loc[ds_values]
+        return self._format_forecast(
+            predictions=forecast["yhat"],
+            index=ds_values,
+            lower=forecast.get("yhat_lower"),
+            upper=forecast.get("yhat_upper"),
+        )
 
-        df_future = pd.DataFrame({"ds": ds_series})
-        df_future["ds"] = pd.to_datetime(df_future["ds"], utc=True).dt.tz_localize(None)
-        forecast = self._model.predict(df_future[["ds"]])
-        return pd.Series(forecast["yhat"].values, index=future.index, name=self.target_column)
+    def component_plot(self) -> Optional["go.Figure"]:
+        if self._model is None or self._history is None:
+            return None
+        try:  # pragma: no cover - optional visualization path
+            from prophet.plot import plot_components_plotly
+        except ImportError:  # pragma: no cover
+            return None
+        forecast = self._model.predict(self._history[["ds"]])
+        figure = plot_components_plotly(self._model, forecast)
+        return figure
