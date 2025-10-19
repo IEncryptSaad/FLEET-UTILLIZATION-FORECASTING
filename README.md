@@ -1,107 +1,88 @@
 # Fleet Utilization Forecasting MVP
 
-This repository contains a small but complete fleet-utilization forecasting MVP. It ships with a
-synthetic dataset, reproducible training pipeline, evaluation utilities, automated tests, and a
-Streamlit dashboard that can be deployed for free.
+This repository delivers a production-ready minimum viable product for forecasting fleet utilization.
+It includes a hardened data cleaning layer, Prophet and ARIMA forecasting models, an end-to-end
+training pipeline, automated regression tests, and a Streamlit dashboard that is ready for one-click
+deployment on Streamlit Community Cloud.
+
+## Key features
+
+- **Robust ingestion** – automatic column normalisation, timezone handling, and schema validation for
+  uploaded CSV files.
+- **Battle-tested models** – Prophet with graceful fallbacks to ARIMA when data volume or quality is
+  insufficient.
+- **Rich dashboard** – cached data/model pipelines, interactive Plotly visuals, download buttons, and
+  optional Prophet component plots.
+- **Deployment ready** – minimal requirements, Streamlit theme configuration, and clean pytest suite.
 
 ## Project structure
 
 ```
 .
 ├── data/
-│   └── fleet_utilization_sample.csv      # synthetic dataset with two years of daily history
+│   └── fleet_utilization_sample.csv
 ├── src/fleet_forecasting/
-│   ├── cli.py                            # command line interface for training and forecasting
-│   ├── data.py                           # dataset loading helpers
-│   ├── evaluation.py                     # RMSE / MAPE / MAE metrics
-│   ├── models/                           # Prophet and ARIMA model wrappers
-│   └── pipeline.py                       # training + forecasting orchestration
-├── streamlit_app.py                      # interactive dashboard for deployment
-├── tests/                                # pytest-based regression test
+│   ├── data.py
+│   ├── evaluation.py
+│   ├── models/
+│   ├── pipeline.py
+│   └── …
+├── streamlit_app.py
+├── tests/
 ├── requirements.txt
-└── pyproject.toml                        # enables `pip install -e .`
+├── pyproject.toml
+└── .streamlit/config.toml
 ```
 
-The MVP uses two complementary models:
+## Local development workflow
 
-- **Prophet** for flexible seasonality modelling
-- **ARIMA** as a lightweight baseline suitable for automated testing
-
-Both models learn the historical utilization rate and produce short-range forecasts suitable for
-capacity planning and maintenance scheduling.
-
-## Getting started locally
-
-1. Create a virtual environment (Python 3.10+ recommended):
+1. **Create and activate a virtual environment (Python 3.10+ recommended):**
 
    ```bash
    python -m venv .venv
-   source .venv/bin/activate
+   source .venv/bin/activate  # Windows: .venv\Scripts\activate
    pip install --upgrade pip
+   ```
+
+2. **Install dependencies and register the package in editable mode:**
+
+   ```bash
    pip install -r requirements.txt
    pip install -e .
    ```
 
-2. Run the training CLI (Prophet by default):
+3. **Run the automated test suite:**
 
    ```bash
-   python -m fleet_forecasting.cli --test-days 30 --future-periods 45
+   pytest -q
    ```
 
-   Output includes evaluation metrics on the hold-out window and a preview of the future forecast.
-   Pass `--export forecasts.csv` to persist the results. Use `--model arima` for a lighter-weight run.
-
-3. Execute the automated test suite (uses the ARIMA model for speed):
-
-   ```bash
-   pytest
-   ```
-
-4. Launch the Streamlit dashboard locally:
+4. **Launch the Streamlit dashboard:**
 
    ```bash
    streamlit run streamlit_app.py
    ```
 
-   The dashboard lets you explore the dataset, compare model forecasts, and download predictions as a
-   CSV file for downstream planning.
+   The app loads the bundled dataset by default, supports CSV uploads, displays validation metrics,
+   and offers forecast downloads.
 
-## Deploying on free infrastructure
+## Deployment on Streamlit Community Cloud
 
-The project is designed around free-to-use services:
+1. Push your fork of this repository to GitHub.
+2. Sign in at [share.streamlit.io](https://share.streamlit.io) and choose **New app**.
+3. Select your repository, set the branch, and use `streamlit_app.py` as the entry point.
+4. The default `requirements.txt` and `.streamlit/config.toml` ensure the app launches with the same
+   theme and dependencies used locally.
 
-- **Streamlit Community Cloud** – deploy the dashboard directly from this repository without any
-  infrastructure cost. After signing in at [share.streamlit.io](https://share.streamlit.io), click
-  *New app*, point it at your fork, set the entrypoint to `streamlit_app.py`, and add the contents of
-  `requirements.txt`.
-- **GitHub Actions** – add a workflow (example below) to automatically run `pytest` on pushes/pull
-  requests for continuous validation using GitHub’s free minutes.
+## Working with your own data
 
-Example `.github/workflows/tests.yml` snippet:
-
-```yaml
-name: tests
-on: [push, pull_request]
-jobs:
-  unit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      - run: pip install -r requirements.txt
-      - run: pip install -e .
-      - run: pytest
-```
-
-## Customising the MVP
-
-- Replace `data/fleet_utilization_sample.csv` with your actual fleet telemetry data. Ensure it keeps a
-  `date` column plus the `utilization_rate` target.
-- Extend `MODEL_REGISTRY` in `src/fleet_forecasting/pipeline.py` with additional models (e.g. XGBoost
-  regressors on engineered features) to create ensembles.
-- Modify `streamlit_app.py` to surface extra KPIs such as maintenance events or fuel consumption.
+- Replace or augment `data/fleet_utilization_sample.csv` with your telemetry export. The loader will
+  automatically detect and rename the date column to `ds`, coerce numeric values, and drop invalid
+  rows.
+- Extend `MODEL_REGISTRY` in `src/fleet_forecasting/pipeline.py` to experiment with additional
+  forecasting models or ensembles.
+- Update `streamlit_app.py` to surface extra KPIs (maintenance events, miles driven, etc.) for your
+  stakeholders.
 
 ## License
 
